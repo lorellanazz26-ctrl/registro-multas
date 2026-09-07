@@ -8,3 +8,4 @@ pages_build_output_dir = "public"
 [[kv_namespaces]]
 binding = "RECORDS_KV"
 id = "11972f7b9c0943d2af2ba31ffbe56930"
+
