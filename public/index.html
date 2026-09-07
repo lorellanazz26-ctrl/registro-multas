@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registro de Multas</title>
+<style>
+  :root{
+    --ink:#1c2321;
+    --paper:#f6f5f1;
+    --line:#d8d5cc;
+    --line-strong:#a8a49a;
+    --rust:#a8452f;
+    --olive-dark:#3f4a37;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family: "Iowan Old Style","Georgia",serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{ max-width:1100px; margin:0 auto; padding:36px 24px 80px; }
+  header{
+    border-bottom:2px solid var(--ink);
+    padding-bottom:18px;
+    margin-bottom:28px;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  h1{ font-size:2rem; margin:0; font-weight:600; }
+  header .tag{ font-family:"Courier New",monospace; font-size:0.78rem; color:var(--line-strong); }
+  .status{ font-family:"Courier New",monospace; font-size:0.75rem; color:var(--olive-dark); margin-top:4px; }
+  .status.error{ color:var(--rust); }
+
+  .panel{ background:#fff; border:1px solid var(--line); padding:22px; margin-bottom:32px; }
+  .panel h2{ font-size:1.05rem; margin:0 0 16px; font-weight:600; }
+  form{ display:grid; grid-template-columns:repeat(4, 1fr); gap:16px; }
+  @media (max-width:800px){ form{grid-template-columns:repeat(2,1fr);} }
+  @media (max-width:480px){ form{grid-template-columns:1fr;} }
+  .field{display:flex;flex-direction:column;gap:6px;}
+  .field label{ font-family:"Courier New",monospace; font-size:0.72rem; color:var(--line-strong); }
+  .field input{
+    font-family:inherit; font-size:0.95rem; padding:9px 10px;
+    border:1px solid var(--line); background:var(--paper); color:var(--ink);
+  }
+  .field input:focus{ outline:none; border-color:var(--rust); }
+  .field.span2{grid-column:span 2;}
+  @media (max-width:480px){.field.span2{grid-column:span 1;}}
+
+  .actions{ grid-column:1/-1; display:flex; justify-content:flex-end; gap:10px; margin-top:4px; }
+  button{
+    font-family:"Courier New",monospace; font-size:0.82rem; padding:10px 20px;
+    border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; letter-spacing:0.3px;
+  }
+  button:hover{background:var(--rust);border-color:var(--rust);}
+  button:disabled{opacity:0.5;cursor:default;}
+  button.secondary{ background:transparent; color:var(--ink); }
+  button.secondary:hover{ background:transparent; color:var(--rust); border-color:var(--rust); }
+
+  .table-wrap{ background:#fff; border:1px solid var(--line); overflow-x:auto; }
+  table{ width:100%; border-collapse:collapse; min-width:920px; }
+  thead th{
+    text-align:left; font-family:"Courier New",monospace; font-size:0.72rem; font-weight:600;
+    color:#fff; background:var(--olive-dark); padding:11px 12px; white-space:nowrap;
+  }
+  tbody td{ padding:11px 12px; border-bottom:1px solid var(--line); font-size:0.9rem; vertical-align:top; }
+  tbody tr:hover{background:#faf9f5;}
+  tbody tr:last-child td{border-bottom:none;}
+  td.num{font-family:"Courier New",monospace;}
+  td.del{text-align:center;}
+  .del-btn{
+    font-family:"Courier New",monospace; font-size:0.75rem; border:1px solid var(--line-strong);
+    background:transparent; color:var(--rust); padding:5px 9px;
+  }
+  .del-btn:hover{background:var(--rust);color:#fff;border-color:var(--rust);}
+
+  .empty{ padding:40px 20px; text-align:center; color:var(--line-strong); font-family:"Courier New",monospace; font-size:0.85rem; }
+
+  .footer-row{ display:flex; justify-content:space-between; align-items:center; margin-top:14px; flex-wrap:wrap; gap:10px; }
+  .count{ font-family:"Courier New",monospace; font-size:0.78rem; color:var(--line-strong); }
+
+  .lock-screen{ min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--paper); padding:24px; }
+  .lock-box{
+    background:#fff; border:1px solid var(--line); padding:36px 32px; width:100%; max-width:340px;
+    display:flex; flex-direction:column; gap:14px; text-align:center;
+  }
+  .lock-title{ font-size:1.3rem; font-weight:600; }
+  .lock-sub{ font-family:"Courier New",monospace; font-size:0.75rem; color:var(--line-strong); margin-bottom:6px; }
+  .lock-box input{
+    font-family:inherit; font-size:1rem; padding:11px 12px; border:1px solid var(--line);
+    background:var(--paper); color:var(--ink); text-align:center;
+  }
+  .lock-box input:focus{ outline:none; border-color:var(--rust); }
+  .lock-box button{ margin-top:4px; }
+  .lock-error{ display:none; color:var(--rust); font-family:"Courier New",monospace; font-size:0.75rem; }
+  .lock-error.show{display:block;}
+</style>
+</head>
+<body>
+
+<div class="lock-screen" id="lockScreen">
+  <form class="lock-box" id="lockForm">
+    <div class="lock-title">Registro de Multas</div>
+    <div class="lock-sub">Ingresa la clave de acceso compartida</div>
+    <input type="password" id="lockInput" placeholder="Clave" autocomplete="off" autofocus>
+    <button type="submit" id="lockSubmit">Entrar</button>
+    <div class="lock-error" id="lockError">Clave incorrecta. Intenta de nuevo.</div>
+  </form>
+</div>
+
+<div class="wrap" id="app" style="display:none;">
+  <header>
+    <div>
+      <h1>Registro de Multas por Errores en Pedidos</h1>
+      <div class="status" id="status">Cargando…</div>
+    </div>
+    <div class="tag">DATOS COMPARTIDOS · CLOUDFLARE</div>
+  </header>
+
+  <div class="panel">
+    <h2>Agregar registro</h2>
+    <form id="form">
+      <div class="field">
+        <label>PICKEADOR</label>
+        <input type="text" id="pickeador" placeholder="Nombre" required>
+      </div>
+      <div class="field">
+        <label>EMBALADOR</label>
+        <input type="text" id="embalador" placeholder="Nombre" required>
+      </div>
+      <div class="field">
+        <label>DUEÑO</label>
+        <input type="text" id="dueno" placeholder="Responsable" required>
+      </div>
+      <div class="field">
+        <label>N° DE PEDIDO</label>
+        <input type="text" id="numeroPedido" placeholder="Ej: 10234" required>
+      </div>
+      <div class="field">
+        <label>FECHA DE PEDIDO</label>
+        <input type="date" id="fechaPedido" required>
+      </div>
+      <div class="field">
+        <label>FECHA DE RECLAMO</label>
+        <input type="date" id="fechaReclamo" required>
+      </div>
+      <div class="field span2">
+        <label>DETECTADO EN</label>
+        <input type="text" id="detectadoEn" placeholder="Ej: Despacho, Cliente, Control de calidad..." required>
+      </div>
+      <div class="actions">
+        <button type="reset" class="secondary">Limpiar</button>
+        <button type="submit" id="submitBtn">Agregar registro</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>N° pedido</th>
+          <th>Fecha pedido</th>
+          <th>Fecha reclamo</th>
+          <th>Pickeador</th>
+          <th>Embalador</th>
+          <th>Dueño</th>
+          <th>Detectado en</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="empty" id="emptyMsg" style="display:none;">Aún no hay registros. Agrega el primero arriba.</div>
+  </div>
+
+  <div class="footer-row">
+    <div class="count" id="count">0 registros</div>
+    <button class="secondary" id="exportBtn">Exportar a CSV</button>
+  </div>
+</div>
+
+<script>
+let ACCESS_CODE = '';
+
+const lockScreen = document.getElementById('lockScreen');
+const lockForm = document.getElementById('lockForm');
+const lockInput = document.getElementById('lockInput');
+const lockError = document.getElementById('lockError');
+const lockSubmit = document.getElementById('lockSubmit');
+const app = document.getElementById('app');
+
+const form = document.getElementById('form');
+const tbody = document.getElementById('tbody');
+const statusEl = document.getElementById('status');
+const emptyMsg = document.getElementById('emptyMsg');
+const countEl = document.getElementById('count');
+const exportBtn = document.getElementById('exportBtn');
+const submitBtn = document.getElementById('submitBtn');
+
+function api(path, options = {}) {
+  return fetch(path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Access-Code': ACCESS_CODE,
+      ...(options.headers || {}),
+    },
+  });
+}
+
+lockForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  lockSubmit.disabled = true;
+  lockSubmit.textContent = 'Verificando…';
+  ACCESS_CODE = lockInput.value;
+
+  try {
+    const res = await api('/api/records');
+    if (res.status === 401) {
+      lockError.classList.add('show');
+      lockInput.value = '';
+      lockInput.focus();
+      ACCESS_CODE = '';
+      return;
+    }
+    if (!res.ok) throw new Error('server error');
+
+    lockScreen.style.display = 'none';
+    app.style.display = 'block';
+    const records = await res.json();
+    renderTable(records);
+    statusEl.textContent = 'Conectado — registro compartido en línea';
+  } catch (err) {
+    console.error(err);
+    lockError.textContent = 'No se pudo conectar. Intenta de nuevo.';
+    lockError.classList.add('show');
+  } finally {
+    lockSubmit.disabled = false;
+    lockSubmit.textContent = 'Entrar';
+  }
+});
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str ?? '';
+  return div.innerHTML;
+}
+
+async function loadRecords() {
+  statusEl.classList.remove('error');
+  statusEl.textContent = 'Actualizando…';
+  try {
+    const res = await api('/api/records');
+    if (!res.ok) throw new Error('No se pudo cargar');
+    const records = await res.json();
+    renderTable(records);
+    statusEl.textContent = 'Conectado — registro compartido en línea';
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = 'Error al cargar los registros.';
+    statusEl.classList.add('error');
+  }
+}
+
+function renderTable(records) {
+  tbody.innerHTML = '';
+  emptyMsg.style.display = records.length === 0 ? 'block' : 'none';
+  countEl.textContent = records.length + (records.length === 1 ? ' registro' : ' registros');
+
+  for (const rec of records) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="num">${escapeHtml(rec.numeroPedido)}</td>
+      <td>${fmtDate(rec.fechaPedido)}</td>
+      <td>${fmtDate(rec.fechaReclamo)}</td>
+      <td>${escapeHtml(rec.pickeador)}</td>
+      <td>${escapeHtml(rec.embalador)}</td>
+      <td>${escapeHtml(rec.dueno)}</td>
+      <td>${escapeHtml(rec.detectadoEn)}</td>
+      <td class="del"><button class="del-btn" data-id="${rec.id}">Eliminar</button></td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  tbody.querySelectorAll('.del-btn').forEach((btn) => {
+    btn.addEventListener('click', () => deleteRecord(btn.dataset.id));
+  });
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Guardando…';
+
+  const payload = {
+    pickeador: document.getElementById('pickeador').value.trim(),
+    embalador: document.getElementById('embalador').value.trim(),
+    dueno: document.getElementById('dueno').value.trim(),
+    numeroPedido: document.getElementById('numeroPedido').value.trim(),
+    fechaPedido: document.getElementById('fechaPedido').value,
+    fechaReclamo: document.getElementById('fechaReclamo').value,
+    detectadoEn: document.getElementById('detectadoEn').value.trim(),
+  };
+
+  try {
+    const res = await api('/api/records', { method: 'POST', body: JSON.stringify(payload) });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || 'No se pudo guardar');
+    }
+    form.reset();
+    await loadRecords();
+  } catch (err) {
+    console.error(err);
+    alert('No se pudo guardar el registro: ' + err.message);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Agregar registro';
+  }
+});
+
+async function deleteRecord(id) {
+  if (!confirm('¿Eliminar este registro? Esta acción no se puede deshacer.')) return;
+  try {
+    const res = await api('/api/records/' + id, { method: 'DELETE' });
+    if (!res.ok) throw new Error('No se pudo eliminar');
+    await loadRecords();
+  } catch (err) {
+    console.error(err);
+    alert('No se pudo eliminar el registro.');
+  }
+}
+
+exportBtn.addEventListener('click', async () => {
+  try {
+    const res = await api('/api/records');
+    const records = await res.json();
+    const headers = ['Numero de pedido', 'Fecha de pedido', 'Fecha de reclamo', 'Pickeador', 'Embalador', 'Dueño', 'Detectado en'];
+    const rows = records.map((r) => [r.numeroPedido, r.fechaPedido, r.fechaReclamo, r.pickeador, r.embalador, r.dueno, r.detectadoEn]);
+    const csv = [headers, ...rows].map((row) => row.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'registro-multas.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error(err);
+    alert('No se pudo exportar.');
+  }
+});
+</script>
+</body>
+</html>

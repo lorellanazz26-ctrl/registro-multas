@@ -1,0 +1,10 @@
+name = "registro-multas"
+compatibility_date = "2024-09-01"
+pages_build_output_dir = "public"
+
+# Después de crear tu KV namespace con:
+#   wrangler kv namespace create RECORDS_KV
+# reemplaza el id de abajo por el que te entregue ese comando.
+[[kv_namespaces]]
+binding = "RECORDS_KV"
+id = "REEMPLAZA_CON_TU_ID_DE_KV"

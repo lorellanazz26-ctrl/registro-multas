@@ -1,0 +1,95 @@
+REGISTRO DE MULTAS — DESPLIEGUE EN CLOUDFLARE PAGES
+=====================================================
+
+Qué incluye esta carpeta:
+  public/index.html          -> la página web
+  functions/api/records.js   -> API: listar y agregar registros
+  functions/api/records/[id].js -> API: eliminar un registro
+  functions/_lib/utils.js    -> lógica compartida (clave de acceso, KV)
+  wrangler.toml               -> configuración del proyecto
+
+Los datos se guardan en Cloudflare KV (una base de datos simple de
+Cloudflare), así que todos los que entren al mismo link ven la misma
+tabla, actualizada en tiempo real.
+
+-----------------------------------------------------------
+PASO 1 — Requisitos
+-----------------------------------------------------------
+1. Una cuenta de Cloudflare (gratis): https://dash.cloudflare.com/sign-up
+2. Tener Node.js instalado en tu computador: https://nodejs.org
+
+-----------------------------------------------------------
+PASO 2 — Instalar Wrangler (la herramienta de Cloudflare)
+-----------------------------------------------------------
+En una terminal, dentro de esta carpeta:
+
+    npm install -g wrangler
+    wrangler login
+
+Esto abre el navegador para que autorices el acceso a tu cuenta.
+
+-----------------------------------------------------------
+PASO 3 — Crear la base de datos (KV)
+-----------------------------------------------------------
+    wrangler kv namespace create RECORDS_KV
+
+Esto imprime algo como:
+
+    { binding = "RECORDS_KV", id = "abc123..." }
+
+Copia ese "id" y pégalo en el archivo wrangler.toml, reemplazando
+"REEMPLAZA_CON_TU_ID_DE_KV".
+
+-----------------------------------------------------------
+PASO 4 — Definir la clave de acceso (secreta)
+-----------------------------------------------------------
+Esta clave NO queda visible en el código, solo Cloudflare la guarda:
+
+    wrangler pages secret put ACCESS_CODE --project-name=registro-multas
+
+Te pedirá que escribas la clave (por ejemplo: bodega2026) y presiones Enter.
+
+Nota: si el proyecto todavía no existe en Cloudflare, primero haz el
+Paso 5 una vez, y luego vuelve a este paso.
+
+-----------------------------------------------------------
+PASO 5 — Desplegar
+-----------------------------------------------------------
+    wrangler pages deploy public --project-name=registro-multas
+
+Al terminar, Wrangler te entrega una URL como:
+
+    https://registro-multas.pages.dev
+
+Esa es la página que puedes compartir con tu equipo.
+
+-----------------------------------------------------------
+PASO 6 — Verificar que la base de datos quedó conectada
+-----------------------------------------------------------
+1. Ve a https://dash.cloudflare.com
+2. Entra a "Workers & Pages" → tu proyecto "registro-multas"
+3. Ve a Settings → Functions → KV namespace bindings
+4. Debe existir un binding: Variable name = RECORDS_KV, apuntando al
+   namespace que creaste en el Paso 3. Si no aparece automáticamente,
+   agrégalo ahí manualmente y vuelve a desplegar (Paso 5).
+
+-----------------------------------------------------------
+CÓMO COMPARTIRLO
+-----------------------------------------------------------
+Envía la URL (https://registro-multas.pages.dev) a quien necesite
+usarlo. Al entrar, les pedirá la clave de acceso que definiste en el
+Paso 4. Todos verán y editarán la misma tabla.
+
+-----------------------------------------------------------
+ACTUALIZAR LA WEB MÁS ADELANTE
+-----------------------------------------------------------
+Si cambias algo en public/index.html o en functions/, vuelve a correr:
+
+    wrangler pages deploy public --project-name=registro-multas
+
+-----------------------------------------------------------
+CAMBIAR LA CLAVE DE ACCESO
+-----------------------------------------------------------
+    wrangler pages secret put ACCESS_CODE --project-name=registro-multas
+
+(vuelve a pedirte la clave nueva y la reemplaza)
