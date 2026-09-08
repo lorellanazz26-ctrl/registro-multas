@@ -7,4 +7,4 @@ pages_build_output_dir = "public"
 # reemplaza el id de abajo por el que te entregue ese comando.
 [[kv_namespaces]]
 binding = "RECORDS_KV"
-id = "REEMPLAZA_CON_TU_ID_DE_KV"
+id = "11972f7b9c0943d2af2ba31ffbe56930"
