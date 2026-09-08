@@ -32,6 +32,7 @@ export async function onRequestPost(context) {
     dueno: body.dueno.trim(),
     numeroPedido: body.numeroPedido.trim(),
     fechaPedido: body.fechaPedido,
+    fechaDespacho: body.fechaDespacho,
     fechaReclamo: body.fechaReclamo,
     detectadoEn: body.detectadoEn.trim(),
     createdAt: new Date().toISOString(),

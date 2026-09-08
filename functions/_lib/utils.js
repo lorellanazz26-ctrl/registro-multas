@@ -36,6 +36,7 @@ const REQUIRED_FIELDS = [
   'dueno',
   'numeroPedido',
   'fechaPedido',
+  'fechaDespacho',
   'fechaReclamo',
   'detectadoEn',
 ];
