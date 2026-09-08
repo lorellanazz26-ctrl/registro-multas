@@ -58,11 +58,11 @@
   @media (max-width:480px){ form{grid-template-columns:1fr;} }
   .field{display:flex;flex-direction:column;gap:6px;}
   .field label{ font-family:"Courier New",monospace; font-size:0.72rem; color:var(--line-strong); }
-  .field input{
+  .field input, .field select{
     font-family:inherit; font-size:0.95rem; padding:9px 10px;
     border:1px solid var(--line); background:var(--paper); color:var(--ink);
   }
-  .field input:focus{ outline:none; border-color:var(--rust); }
+  .field input:focus, .field select:focus{ outline:none; border-color:var(--rust); }
   .field input.autofilled{ background:#fbf6e9; border-color:var(--mustard); }
   .field.span2{grid-column:span 2;}
   @media (max-width:480px){.field.span2{grid-column:span 1;}}
@@ -79,7 +79,7 @@
   button.secondary:hover{ background:transparent; color:var(--rust); border-color:var(--rust); }
 
   .table-wrap{ background:#fff; border:1px solid var(--line); overflow-x:auto; }
-  table{ width:100%; border-collapse:collapse; min-width:1040px; }
+  table{ width:100%; border-collapse:collapse; min-width:1200px; }
   thead th{
     text-align:left; font-family:"Courier New",monospace; font-size:0.72rem; font-weight:600;
     color:#fff; background:var(--olive-dark); padding:11px 12px; white-space:nowrap;
@@ -185,6 +185,16 @@
         <label>DETECTADO EN</label>
         <input type="text" id="detectadoEn" placeholder="Ej: Despacho, Cliente, Control de calidad..." required>
       </div>
+      <div class="field span2">
+        <label>TIPO DE RECLAMO</label>
+        <select id="tipoReclamo" required>
+          <option value="" disabled selected>Selecciona una opción</option>
+          <option value="Libros sucios">Libros sucios</option>
+          <option value="Libros faltantes">Libros faltantes</option>
+          <option value="Libros cambiados">Libros cambiados</option>
+          <option value="Libros sobrantes">Libros sobrantes</option>
+        </select>
+      </div>
       <div class="actions">
         <button type="reset" class="secondary">Limpiar</button>
         <button type="submit" id="submitBtn">Agregar registro</button>
@@ -204,6 +214,7 @@
           <th>Embalador</th>
           <th>Dueño</th>
           <th>Detectado en</th>
+          <th>Tipo de reclamo</th>
           <th></th>
         </tr>
       </thead>
@@ -451,6 +462,7 @@ function renderTable(records) {
       <td>${escapeHtml(rec.embalador)}</td>
       <td>${escapeHtml(rec.dueno)}</td>
       <td>${escapeHtml(rec.detectadoEn)}</td>
+      <td>${escapeHtml(rec.tipoReclamo)}</td>
       <td class="del"><button class="del-btn" data-id="${rec.id}">Eliminar</button></td>
     `;
     tbody.appendChild(tr);
@@ -475,6 +487,7 @@ form.addEventListener('submit', async (e) => {
     fechaDespacho: document.getElementById('fechaDespacho').value,
     fechaReclamo: document.getElementById('fechaReclamo').value,
     detectadoEn: document.getElementById('detectadoEn').value.trim(),
+    tipoReclamo: document.getElementById('tipoReclamo').value,
   };
 
   try {
@@ -512,8 +525,8 @@ exportBtn.addEventListener('click', async () => {
   try {
     const res = await api('/api/records');
     const records = await res.json();
-    const headers = ['Numero de pedido', 'Fecha de pedido', 'Fecha de despacho', 'Fecha de reclamo', 'Pickeador', 'Embalador', 'Dueño', 'Detectado en'];
-    const rows = records.map((r) => [r.numeroPedido, r.fechaPedido, r.fechaDespacho, r.fechaReclamo, r.pickeador, r.embalador, r.dueno, r.detectadoEn]);
+    const headers = ['Numero de pedido', 'Fecha de pedido', 'Fecha de despacho', 'Fecha de reclamo', 'Pickeador', 'Embalador', 'Dueño', 'Detectado en', 'Tipo de reclamo'];
+    const rows = records.map((r) => [r.numeroPedido, r.fechaPedido, r.fechaDespacho, r.fechaReclamo, r.pickeador, r.embalador, r.dueno, r.detectadoEn, r.tipoReclamo]);
     const csv = [headers, ...rows].map((row) => row.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

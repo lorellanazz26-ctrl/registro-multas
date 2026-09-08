@@ -35,6 +35,7 @@ export async function onRequestPost(context) {
     fechaDespacho: body.fechaDespacho,
     fechaReclamo: body.fechaReclamo,
     detectadoEn: body.detectadoEn.trim(),
+    tipoReclamo: body.tipoReclamo,
     createdAt: new Date().toISOString(),
   };
 

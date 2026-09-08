@@ -39,6 +39,7 @@ const REQUIRED_FIELDS = [
   'fechaDespacho',
   'fechaReclamo',
   'detectadoEn',
+  'tipoReclamo',
 ];
 
 export function validateRecord(body) {
@@ -47,5 +48,15 @@ export function validateRecord(body) {
       return `Falta el campo: ${field}`;
     }
   }
+  if (!TIPOS_RECLAMO.includes(body.tipoReclamo)) {
+    return 'Tipo de reclamo inválido.';
+  }
   return null;
 }
+
+export const TIPOS_RECLAMO = [
+  'Libros sucios',
+  'Libros faltantes',
+  'Libros cambiados',
+  'Libros sobrantes',
+];
