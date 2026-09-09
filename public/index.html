@@ -118,6 +118,30 @@
   .lock-box button{ margin-top:4px; }
   .lock-error{ display:none; color:var(--rust); font-family:"Courier New",monospace; font-size:0.75rem; }
   .lock-error.show{display:block;}
+
+  .justificado-link{
+    font-family:"Courier New",monospace; font-size:0.75rem; color:var(--olive-dark);
+    text-decoration:underline; cursor:pointer; font-weight:600;
+  }
+  .justificado-link:hover{ color:var(--rust); }
+  .no-justificado{ color:var(--line-strong); font-family:"Courier New",monospace; font-size:0.78rem; }
+
+  .modal-overlay{
+    display:none; position:fixed; inset:0; background:rgba(28,35,33,0.82);
+    align-items:center; justify-content:center; padding:24px; z-index:1000;
+  }
+  .modal-overlay.show{ display:flex; }
+  .modal-box{
+    background:#fff; padding:20px; max-width:min(600px, 92vw); max-height:90vh;
+    overflow:auto; position:relative; text-align:center;
+  }
+  .modal-title{ font-family:"Courier New",monospace; font-size:0.82rem; margin-bottom:12px; color:var(--ink); }
+  .modal-box img{ max-width:100%; max-height:70vh; display:block; margin:0 auto; }
+  .modal-close{
+    position:absolute; top:8px; right:8px; background:var(--ink); color:#fff; border:none;
+    width:28px; height:28px; cursor:pointer; font-family:"Courier New",monospace; font-size:0.9rem;
+  }
+  .modal-close:hover{ background:var(--rust); }
 </style>
 </head>
 <body>
@@ -149,6 +173,23 @@
       <input type="file" id="csvFile" accept=".csv" style="display:none;">
       <span class="upload-status" id="uploadStatus">Ningún archivo cargado todavía.</span>
     </div>
+  </div>
+
+  <div class="panel">
+    <h2>Justificativos</h2>
+    <p class="hint">Sube una foto para justificar un pedido. Al escribirse ese número en la tabla, aparecerá marcado como "Justificado".</p>
+    <form id="justForm" class="upload-row" style="align-items:flex-end;">
+      <div class="field" style="max-width:220px;">
+        <label>N° DE PEDIDO</label>
+        <input type="text" id="justNumeroPedido" placeholder="Ej: 200604507" required autocomplete="off">
+      </div>
+      <div class="field">
+        <label>FOTOGRAFÍA</label>
+        <input type="file" id="justPhoto" accept="image/*" capture="environment" required>
+      </div>
+      <button type="submit" id="justSubmitBtn">Guardar justificativo</button>
+      <span class="upload-status" id="justStatus"></span>
+    </form>
   </div>
 
   <div class="panel">
@@ -218,6 +259,7 @@
           <th class="col-name">Dueño</th>
           <th>Detectado en</th>
           <th>Tipo de reclamo</th>
+          <th class="col-date">Justificado</th>
           <th class="col-del"></th>
         </tr>
       </thead>
@@ -229,6 +271,14 @@
   <div class="footer-row">
     <div class="count" id="count">0 registros</div>
     <button class="secondary" id="exportBtn">Exportar a CSV</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="justModal">
+  <div class="modal-box">
+    <button class="modal-close" id="justModalClose" type="button">✕</button>
+    <div class="modal-title" id="justModalTitle"></div>
+    <img id="justModalImg" src="" alt="Foto del justificativo">
   </div>
 </div>
 
@@ -255,6 +305,16 @@ const uploadStatus = document.getElementById('uploadStatus');
 const numeroPedidoInput = document.getElementById('numeroPedido');
 const pedidosList = document.getElementById('pedidosList');
 const pedidoNote = document.getElementById('pedidoNote');
+
+const justForm = document.getElementById('justForm');
+const justStatus = document.getElementById('justStatus');
+const justSubmitBtn = document.getElementById('justSubmitBtn');
+const justModal = document.getElementById('justModal');
+const justModalImg = document.getElementById('justModalImg');
+const justModalTitle = document.getElementById('justModalTitle');
+const justModalClose = document.getElementById('justModalClose');
+
+let justificadosSet = new Set();
 
 // ------------------------------------------------------------------
 // Lookup de pedidos construido desde el CSV de movimientos de bodega
@@ -373,6 +433,114 @@ numeroPedidoInput.addEventListener('input', () => {
 });
 
 // ------------------------------------------------------------------
+// Justificativos (foto por número de pedido)
+// ------------------------------------------------------------------
+function compressImage(file, maxDim = 1600, quality = 0.75) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round(height * (maxDim / width));
+            width = maxDim;
+          } else {
+            width = Math.round(width * (maxDim / height));
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('No se pudo leer la imagen.'));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function loadJustificados() {
+  try {
+    const res = await api('/api/justificativos');
+    if (!res.ok) throw new Error('No se pudo cargar justificativos');
+    const numeros = await res.json();
+    justificadosSet = new Set(numeros);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+justForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const numero = document.getElementById('justNumeroPedido').value.trim();
+  const fileInput = document.getElementById('justPhoto');
+  const file = fileInput.files[0];
+  if (!numero || !file) return;
+
+  justSubmitBtn.disabled = true;
+  justSubmitBtn.textContent = 'Guardando…';
+  justStatus.textContent = 'Procesando imagen…';
+  justStatus.className = 'upload-status pending';
+
+  try {
+    const photoDataUrl = await compressImage(file);
+    const res = await api('/api/justificativos', {
+      method: 'POST',
+      body: JSON.stringify({ numeroPedido: numero, photo: photoDataUrl }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || 'No se pudo guardar');
+    }
+    justificadosSet.add(numero);
+    justForm.reset();
+    justStatus.textContent = `✓ Justificativo guardado para el pedido ${numero}.`;
+    justStatus.className = 'upload-status';
+    await loadRecords();
+  } catch (err) {
+    console.error(err);
+    justStatus.textContent = 'Error: ' + err.message;
+    justStatus.className = 'upload-status error';
+  } finally {
+    justSubmitBtn.disabled = false;
+    justSubmitBtn.textContent = 'Guardar justificativo';
+  }
+});
+
+function renderJustificadoCell(numeroPedido) {
+  if (justificadosSet.has(numeroPedido)) {
+    return `<span class="justificado-link" data-pedido="${escapeHtml(numeroPedido)}">Justificado</span>`;
+  }
+  return '<span class="no-justificado">—</span>';
+}
+
+async function showJustificativo(numeroPedido) {
+  try {
+    const res = await api('/api/justificativos/' + encodeURIComponent(numeroPedido));
+    if (!res.ok) throw new Error('No se pudo cargar la foto.');
+    const data = await res.json();
+    justModalTitle.textContent = 'Justificativo — Pedido ' + data.numeroPedido;
+    justModalImg.src = data.photo;
+    justModal.classList.add('show');
+  } catch (err) {
+    console.error(err);
+    alert('No se pudo cargar el justificativo.');
+  }
+}
+
+justModalClose.addEventListener('click', () => justModal.classList.remove('show'));
+justModal.addEventListener('click', (e) => {
+  if (e.target === justModal) justModal.classList.remove('show');
+});
+
+// ------------------------------------------------------------------
 // Autenticación
 // ------------------------------------------------------------------
 function api(path, options = {}) {
@@ -406,6 +574,7 @@ lockForm.addEventListener('submit', async (e) => {
     lockScreen.style.display = 'none';
     app.style.display = 'block';
     const records = await res.json();
+    await loadJustificados();
     renderTable(records);
     statusEl.textContent = 'Conectado — registro compartido en línea';
   } catch (err) {
@@ -466,6 +635,7 @@ function renderTable(records) {
       <td>${escapeHtml(rec.dueno)}</td>
       <td>${escapeHtml(rec.detectadoEn)}</td>
       <td>${escapeHtml(rec.tipoReclamo)}</td>
+      <td>${renderJustificadoCell(rec.numeroPedido)}</td>
       <td class="del"><button class="del-btn" data-id="${rec.id}">Eliminar</button></td>
     `;
     tbody.appendChild(tr);
@@ -473,6 +643,9 @@ function renderTable(records) {
 
   tbody.querySelectorAll('.del-btn').forEach((btn) => {
     btn.addEventListener('click', () => deleteRecord(btn.dataset.id));
+  });
+  tbody.querySelectorAll('.justificado-link').forEach((el) => {
+    el.addEventListener('click', () => showJustificativo(el.dataset.pedido));
   });
 }
 
