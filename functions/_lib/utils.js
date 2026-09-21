@@ -30,6 +30,13 @@ export async function saveAllRecords(env, records) {
   await env.RECORDS_KV.put('records', JSON.stringify(records));
 }
 
+export const TIPOS_RECLAMO = [
+  'Libros sucios',
+  'Libros faltantes',
+  'Libros cambiados',
+  'Libros sobrantes',
+];
+
 const REQUIRED_FIELDS = [
   'pickeador',
   'embalador',
@@ -53,10 +60,3 @@ export function validateRecord(body) {
   }
   return null;
 }
-
-export const TIPOS_RECLAMO = [
-  'Libros sucios',
-  'Libros faltantes',
-  'Libros cambiados',
-  'Libros sobrantes',
-];

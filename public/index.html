@@ -127,7 +127,7 @@
   .no-justificado{ color:var(--line-strong); font-family:"Courier New",monospace; font-size:0.78rem; }
 
   .modal-overlay{
-    display:none; position:fixed; inset:0; background:rgba(28,35,33,0.82);
+    display:none; position:fixed; inset:0; background:rgba(18,36,56,0.82);
     align-items:center; justify-content:center; padding:24px; z-index:1000;
   }
   .modal-overlay.show{ display:flex; }
@@ -167,7 +167,7 @@
 
   <div class="panel">
     <h2>Cargar log de movimientos (opcional)</h2>
-    <p class="hint">Sube el CSV de movimientos de bodega para autocompletar pickeador, embalador, dueño y fecha de despacho al escribir el número de pedido.</p>
+    <p class="hint">Sube el CSV de movimientos de bodega para autocompletar pickeador, embalador, dueño, fecha de pedido y fecha de despacho al escribir el número de pedido.</p>
     <div class="upload-row">
       <label class="upload-btn" for="csvFile">📄 Elegir archivo CSV</label>
       <input type="file" id="csvFile" accept=".csv" style="display:none;">
@@ -319,20 +319,22 @@ let justificadosSet = new Set();
 // ------------------------------------------------------------------
 // Lookup de pedidos construido desde el CSV de movimientos de bodega
 // ------------------------------------------------------------------
-let pedidosLookup = {}; // { numeroPedido: { dueno, pickeador, embalador, fechaDespacho } }
+let pedidosLookup = {}; // { numeroPedido: { dueno, pickeador, embalador, fechaPedido, fechaDespacho } }
 
 const MOVTO_PICKEADOR = 'Picking To Forklift';
 const MOVTO_EMBALADOR = 'Packing';
 const MOVTOS_DESPACHO = ['Shipping Camion', 'Shipping'];
 
-function parseFinToDateInput(finStr) {
-  // Formato de entrada esperado: "DD/MM/AAAA HH:MM:SS"
-  if (!finStr) return null;
-  const datePart = finStr.trim().split(' ')[0];
-  const parts = datePart.split('/');
+function parseCsvDateToInput(dateStr) {
+  // Acepta "DD/MM/AAAA HH:MM:SS", "DD-MM-AAAA H:MM", o solo "DD-MM-AAAA" / "DD/MM/AAAA"
+  if (!dateStr) return null;
+  const datePart = dateStr.trim().split(' ')[0];
+  const sep = datePart.includes('-') ? '-' : (datePart.includes('/') ? '/' : null);
+  if (!sep) return null;
+  const parts = datePart.split(sep);
   if (parts.length !== 3) return null;
   const [d, m, y] = parts;
-  if (!d || !m || !y) return null;
+  if (!d || !m || !y || y.length !== 4) return null;
   return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
 }
 
@@ -356,11 +358,16 @@ csvFileInput.addEventListener('change', (e) => {
       if (!doc) return;
 
       if (!pedidosLookup[doc]) {
-        pedidosLookup[doc] = { dueno: '', pickeador: '', embalador: '', fechaDespacho: '' };
+        pedidosLookup[doc] = { dueno: '', pickeador: '', embalador: '', fechaPedido: '', fechaDespacho: '' };
       }
       const entry = pedidosLookup[doc];
 
       if (r['Dueño']) entry.dueno = r['Dueño'].trim();
+
+      if (r['FECHA PEDIDO'] && !entry.fechaPedido) {
+        const parsedPedido = parseCsvDateToInput(r['FECHA PEDIDO']);
+        if (parsedPedido) entry.fechaPedido = parsedPedido;
+      }
 
       const movto = (r['Movto.'] || '').trim();
       const operador = (r['Operador'] || '').trim();
@@ -373,7 +380,7 @@ csvFileInput.addEventListener('change', (e) => {
         entry.embalador = operador;
       }
       if (MOVTOS_DESPACHO.includes(movto) && fin) {
-        const parsed = parseFinToDateInput(fin);
+        const parsed = parseCsvDateToInput(fin);
         if (parsed) entry.fechaDespacho = parsed;
       }
     },
@@ -401,7 +408,7 @@ csvFileInput.addEventListener('change', (e) => {
 
 function applyLookup(doc) {
   const entry = pedidosLookup[doc];
-  const fields = ['dueno', 'pickeador', 'embalador', 'fechaDespacho'];
+  const fields = ['dueno', 'pickeador', 'embalador', 'fechaPedido', 'fechaDespacho'];
 
   fields.forEach((id) => {
     document.getElementById(id).classList.remove('autofilled');
@@ -417,11 +424,13 @@ function applyLookup(doc) {
   if (entry.dueno) { document.getElementById('dueno').value = entry.dueno; document.getElementById('dueno').classList.add('autofilled'); }
   if (entry.pickeador) { document.getElementById('pickeador').value = entry.pickeador; document.getElementById('pickeador').classList.add('autofilled'); }
   if (entry.embalador) { document.getElementById('embalador').value = entry.embalador; document.getElementById('embalador').classList.add('autofilled'); }
+  if (entry.fechaPedido) { document.getElementById('fechaPedido').value = entry.fechaPedido; document.getElementById('fechaPedido').classList.add('autofilled'); }
   if (entry.fechaDespacho) { document.getElementById('fechaDespacho').value = entry.fechaDespacho; document.getElementById('fechaDespacho').classList.add('autofilled'); }
 
   const missing = [];
   if (!entry.pickeador) missing.push('pickeador');
   if (!entry.embalador) missing.push('embalador');
+  if (!entry.fechaPedido) missing.push('fecha de pedido');
   if (!entry.fechaDespacho) missing.push('fecha de despacho');
   pedidoNote.textContent = missing.length
     ? `Autocompletado parcial — falta: ${missing.join(', ')}.`
