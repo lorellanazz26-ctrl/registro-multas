@@ -166,12 +166,22 @@
   </header>
 
   <div class="panel">
-    <h2>Cargar log de movimientos (opcional)</h2>
+    <h2>Cargar log de salidas</h2>
     <p class="hint">Sube el CSV de movimientos de bodega para autocompletar pickeador, embalador, dueño, fecha de pedido y fecha de despacho al escribir el número de pedido.</p>
     <div class="upload-row">
       <label class="upload-btn" for="csvFile">📄 Elegir archivo CSV</label>
       <input type="file" id="csvFile" accept=".csv" style="display:none;">
       <span class="upload-status" id="uploadStatus">Ningún archivo cargado todavía.</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Cargar avance de salidas</h2>
+    <p class="hint">Sube el CSV de avance de salidas para autocompletar cliente, fecha de pedido y fecha de despacho al escribir el número de pedido.</p>
+    <div class="upload-row">
+      <label class="upload-btn" for="avanceFile">📄 Elegir archivo CSV</label>
+      <input type="file" id="avanceFile" accept=".csv" style="display:none;">
+      <span class="upload-status" id="avanceUploadStatus">Ningún archivo cargado todavía.</span>
     </div>
   </div>
 
@@ -204,6 +214,10 @@
       <div class="field">
         <label>DUEÑO</label>
         <input type="text" id="dueno" placeholder="Responsable" required>
+      </div>
+      <div class="field">
+        <label>CLIENTE</label>
+        <input type="text" id="cliente" placeholder="Nombre del cliente" required>
       </div>
       <div class="field">
         <label>PICKEADOR</label>
@@ -257,6 +271,7 @@
           <th class="col-name">Pickeador</th>
           <th class="col-name">Embalador</th>
           <th class="col-name">Dueño</th>
+          <th class="col-name">Cliente</th>
           <th>Detectado en</th>
           <th>Tipo de reclamo</th>
           <th class="col-date">Justificado</th>
@@ -302,6 +317,8 @@ const submitBtn = document.getElementById('submitBtn');
 
 const csvFileInput = document.getElementById('csvFile');
 const uploadStatus = document.getElementById('uploadStatus');
+const avanceFileInput = document.getElementById('avanceFile');
+const avanceUploadStatus = document.getElementById('avanceUploadStatus');
 const numeroPedidoInput = document.getElementById('numeroPedido');
 const pedidosList = document.getElementById('pedidosList');
 const pedidoNote = document.getElementById('pedidoNote');
@@ -319,7 +336,25 @@ let justificadosSet = new Set();
 // ------------------------------------------------------------------
 // Lookup de pedidos construido desde el CSV de movimientos de bodega
 // ------------------------------------------------------------------
-let pedidosLookup = {}; // { numeroPedido: { dueno, pickeador, embalador, fechaPedido, fechaDespacho } }
+let pedidosLookup = {}; // { numeroPedido: { dueno, cliente, pickeador, embalador, fechaPedido, fechaDespacho } }
+
+function getEntry(doc) {
+  if (!pedidosLookup[doc]) {
+    pedidosLookup[doc] = { dueno: '', cliente: '', pickeador: '', embalador: '', fechaPedido: '', fechaDespacho: '' };
+  }
+  return pedidosLookup[doc];
+}
+
+function refreshPedidosDatalist() {
+  pedidosList.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  Object.keys(pedidosLookup).forEach((doc) => {
+    const opt = document.createElement('option');
+    opt.value = doc;
+    frag.appendChild(opt);
+  });
+  pedidosList.appendChild(frag);
+}
 
 const MOVTO_PICKEADOR = 'Picking To Forklift';
 const MOVTO_EMBALADOR = 'Packing';
@@ -345,8 +380,6 @@ csvFileInput.addEventListener('change', (e) => {
   uploadStatus.textContent = 'Leyendo archivo…';
   uploadStatus.className = 'upload-status pending';
 
-  pedidosLookup = {};
-
   Papa.parse(file, {
     header: true,
     delimiter: ';',
@@ -357,10 +390,7 @@ csvFileInput.addEventListener('change', (e) => {
       const doc = (r['Documento'] || '').trim();
       if (!doc) return;
 
-      if (!pedidosLookup[doc]) {
-        pedidosLookup[doc] = { dueno: '', pickeador: '', embalador: '', fechaPedido: '', fechaDespacho: '' };
-      }
-      const entry = pedidosLookup[doc];
+      const entry = getEntry(doc);
 
       if (r['Dueño']) entry.dueno = r['Dueño'].trim();
 
@@ -386,17 +416,9 @@ csvFileInput.addEventListener('change', (e) => {
     },
     complete: () => {
       const total = Object.keys(pedidosLookup).length;
-      uploadStatus.textContent = `✓ ${total.toLocaleString('es-CL')} pedidos indexados desde "${file.name}".`;
+      uploadStatus.textContent = `✓ Log de salidas cargado — ${total.toLocaleString('es-CL')} pedidos indexados en total.`;
       uploadStatus.className = 'upload-status';
-
-      pedidosList.innerHTML = '';
-      const frag = document.createDocumentFragment();
-      Object.keys(pedidosLookup).forEach((doc) => {
-        const opt = document.createElement('option');
-        opt.value = doc;
-        frag.appendChild(opt);
-      });
-      pedidosList.appendChild(frag);
+      refreshPedidosDatalist();
     },
     error: (err) => {
       console.error(err);
@@ -406,9 +428,54 @@ csvFileInput.addEventListener('change', (e) => {
   });
 });
 
+avanceFileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  avanceUploadStatus.textContent = 'Leyendo archivo…';
+  avanceUploadStatus.className = 'upload-status pending';
+
+  Papa.parse(file, {
+    header: true,
+    delimiter: ';',
+    skipEmptyLines: true,
+    encoding: 'UTF-8',
+    step: (row) => {
+      const r = row.data;
+      const doc = (r['Nº Doc.'] || '').trim();
+      if (!doc) return;
+
+      const entry = getEntry(doc);
+
+      if (r['Nombre Cliente']) entry.cliente = r['Nombre Cliente'].trim();
+      if (r['Dueño']) entry.dueno = r['Dueño'].trim();
+
+      if (r['Fecha Creacion'] && !entry.fechaPedido) {
+        const parsedPedido = parseCsvDateToInput(r['Fecha Creacion']);
+        if (parsedPedido) entry.fechaPedido = parsedPedido;
+      }
+      if (r['Fecha Despacho'] && !entry.fechaDespacho) {
+        const parsedDespacho = parseCsvDateToInput(r['Fecha Despacho']);
+        if (parsedDespacho) entry.fechaDespacho = parsedDespacho;
+      }
+    },
+    complete: () => {
+      const total = Object.keys(pedidosLookup).length;
+      avanceUploadStatus.textContent = `✓ Avance de salidas cargado — ${total.toLocaleString('es-CL')} pedidos indexados en total.`;
+      avanceUploadStatus.className = 'upload-status';
+      refreshPedidosDatalist();
+    },
+    error: (err) => {
+      console.error(err);
+      avanceUploadStatus.textContent = 'Error al leer el archivo. Verifica que sea un CSV válido.';
+      avanceUploadStatus.className = 'upload-status error';
+    },
+  });
+});
+
 function applyLookup(doc) {
   const entry = pedidosLookup[doc];
-  const fields = ['dueno', 'pickeador', 'embalador', 'fechaPedido', 'fechaDespacho'];
+  const fields = ['dueno', 'cliente', 'pickeador', 'embalador', 'fechaPedido', 'fechaDespacho'];
 
   fields.forEach((id) => {
     document.getElementById(id).classList.remove('autofilled');
@@ -416,25 +483,27 @@ function applyLookup(doc) {
 
   if (!entry) {
     pedidoNote.textContent = Object.keys(pedidosLookup).length > 0
-      ? 'Pedido no encontrado en el archivo cargado — completa manualmente.'
+      ? 'Pedido no encontrado en los archivos cargados — completa manualmente.'
       : '';
     return;
   }
 
   if (entry.dueno) { document.getElementById('dueno').value = entry.dueno; document.getElementById('dueno').classList.add('autofilled'); }
+  if (entry.cliente) { document.getElementById('cliente').value = entry.cliente; document.getElementById('cliente').classList.add('autofilled'); }
   if (entry.pickeador) { document.getElementById('pickeador').value = entry.pickeador; document.getElementById('pickeador').classList.add('autofilled'); }
   if (entry.embalador) { document.getElementById('embalador').value = entry.embalador; document.getElementById('embalador').classList.add('autofilled'); }
   if (entry.fechaPedido) { document.getElementById('fechaPedido').value = entry.fechaPedido; document.getElementById('fechaPedido').classList.add('autofilled'); }
   if (entry.fechaDespacho) { document.getElementById('fechaDespacho').value = entry.fechaDespacho; document.getElementById('fechaDespacho').classList.add('autofilled'); }
 
   const missing = [];
+  if (!entry.cliente) missing.push('cliente');
   if (!entry.pickeador) missing.push('pickeador');
   if (!entry.embalador) missing.push('embalador');
   if (!entry.fechaPedido) missing.push('fecha de pedido');
   if (!entry.fechaDespacho) missing.push('fecha de despacho');
   pedidoNote.textContent = missing.length
     ? `Autocompletado parcial — falta: ${missing.join(', ')}.`
-    : 'Autocompletado desde el archivo cargado.';
+    : 'Autocompletado desde los archivos cargados.';
 }
 
 numeroPedidoInput.addEventListener('input', () => {
@@ -642,6 +711,7 @@ function renderTable(records) {
       <td>${escapeHtml(rec.pickeador)}</td>
       <td>${escapeHtml(rec.embalador)}</td>
       <td>${escapeHtml(rec.dueno)}</td>
+      <td>${escapeHtml(rec.cliente)}</td>
       <td>${escapeHtml(rec.detectadoEn)}</td>
       <td>${escapeHtml(rec.tipoReclamo)}</td>
       <td>${renderJustificadoCell(rec.numeroPedido)}</td>
@@ -667,6 +737,7 @@ form.addEventListener('submit', async (e) => {
     pickeador: document.getElementById('pickeador').value.trim(),
     embalador: document.getElementById('embalador').value.trim(),
     dueno: document.getElementById('dueno').value.trim(),
+    cliente: document.getElementById('cliente').value.trim(),
     numeroPedido: document.getElementById('numeroPedido').value.trim(),
     fechaPedido: document.getElementById('fechaPedido').value,
     fechaDespacho: document.getElementById('fechaDespacho').value,
@@ -710,8 +781,8 @@ exportBtn.addEventListener('click', async () => {
   try {
     const res = await api('/api/records');
     const records = await res.json();
-    const headers = ['Numero de pedido', 'Fecha de pedido', 'Fecha de despacho', 'Fecha de reclamo', 'Pickeador', 'Embalador', 'Dueño', 'Detectado en', 'Tipo de reclamo'];
-    const rows = records.map((r) => [r.numeroPedido, r.fechaPedido, r.fechaDespacho, r.fechaReclamo, r.pickeador, r.embalador, r.dueno, r.detectadoEn, r.tipoReclamo]);
+    const headers = ['Numero de pedido', 'Fecha de pedido', 'Fecha de despacho', 'Fecha de reclamo', 'Pickeador', 'Embalador', 'Dueño', 'Cliente', 'Detectado en', 'Tipo de reclamo'];
+    const rows = records.map((r) => [r.numeroPedido, r.fechaPedido, r.fechaDespacho, r.fechaReclamo, r.pickeador, r.embalador, r.dueno, r.cliente, r.detectadoEn, r.tipoReclamo]);
     const csv = [headers, ...rows].map((row) => row.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

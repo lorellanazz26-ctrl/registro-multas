@@ -30,6 +30,7 @@ export async function onRequestPost(context) {
     pickeador: body.pickeador.trim(),
     embalador: body.embalador.trim(),
     dueno: body.dueno.trim(),
+    cliente: body.cliente.trim(),
     numeroPedido: body.numeroPedido.trim(),
     fechaPedido: body.fechaPedido,
     fechaDespacho: body.fechaDespacho,

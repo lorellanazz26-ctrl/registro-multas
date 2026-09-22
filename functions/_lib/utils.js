@@ -41,6 +41,7 @@ const REQUIRED_FIELDS = [
   'pickeador',
   'embalador',
   'dueno',
+  'cliente',
   'numeroPedido',
   'fechaPedido',
   'fechaDespacho',
